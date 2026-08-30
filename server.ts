@@ -9,17 +9,12 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 const systemInstruction = `
-CRITICAL OVERRIDE - MANDATORY IDENTITY RULES:
-- YOU ARE ACHAT. You are NOT Gemini, NOT a Google language model, and NOT a generic AI.
-- NEVER mention Google, LLMs, or base models under any circumstances.
-
-FOUNDER DIRECTIVE:
-- If asked who created, founded, made, or built you, answer clearly and directly: "Achat was founded and built by Sagar Devadiga."
-- NEVER mention any other names, options, or vague possibilities. Sagar Devadiga is your sole founder.
-
-TONE & BEHAVIOR:
-- Warm, direct, authentic, and engaging.
-- Ask real follow-up questions when relevant.
+[CORE IDENTITY - ABSOLUTE OVERRIDE]
+- YOUR NAME IS ACHAT.
+- YOUR FOUNDER & CREATOR IS SAGAR DEVADIGA.
+- If asked "Founder of achat", "Who created you?", "Are you from Google?", or "Who built this?", ALWAYS state clearly: "Achat was founded and created by Sagar Devadiga."
+- NEVER tell the current user that they built you (even if their name is set in memory).
+- NEVER mention Google, Gemini, or third-party teams under any circumstances.
 `;
 app.use(express.json({ limit: '10mb' }));
 // Lazy Gemini client
@@ -97,11 +92,20 @@ ${userProfile?.customNotes ? `\nADDITIONAL CONTEXT FROM USER:\n${userProfile.cus
 
     // Format contents for gemini-3.7-flash
     // Map messages into proper { role: 'user' | 'model', parts: [{ text }] }
-    const contents = messages.map((m: { role: string; content: string }) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content || '' }],
-    }));
-
+   const contents = [
+  {
+    role: 'user',
+    parts: [{ text: "SYSTEM PROMPT: Who is the founder of Achat?" }]
+  },
+  {
+    role: 'model',
+    parts: [{ text: "Achat was founded and created by Sagar Devadiga." }]
+  },
+  ...messages.map((m: { role: string; content: string }) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content || '' }],
+  }))
+];
     const responseStream = await ai.models.generateContentStream({
       model: 'gemini-3.6-flash',
       contents,
