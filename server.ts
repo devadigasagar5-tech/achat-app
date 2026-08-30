@@ -10,15 +10,6 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' }));
-// Password authorization check
-app.use('/api', (req: any, res: any, next: any) => {
-  const userKey = req.headers['x-access-key'];
-  if (userKey !== process.env.APP_PASSWORD) {
-    return res.status(401).json({ error: 'Unauthorized access: Invalid key' });
-  }
-  next();
-});
-
 // Lazy Gemini client
 let genAIClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI {
