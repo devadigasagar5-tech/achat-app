@@ -45,7 +45,7 @@ app.get('/api/health', (req, res) => {
 // SSE Streaming Chat Endpoint
 app.post('/api/chat/stream', async (req, res) => {
   try {
-    const { messages, memories, userProfile } = req.body;
+    const { messages } = req.body;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       res.status(400).json({ error: 'Messages array is required' });
@@ -58,62 +58,36 @@ app.post('/api/chat/stream', async (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders?.();
 
-    // Construct system instructions
-    const vibe = userProfile?.vibe || 'reflective';
-    const userName = userProfile?.name?.trim() || userProfile?.nickname?.trim() || 'my friend';
+    // Prevent proxy timeout on free hosting
+    res.write(':\n\n');
 
-    let toneDescription = 'calm, deeply attentive, thoughtful, grounded, and concise';
-    if (vibe === 'warm') {
-      toneDescription = 'warm, nurturing, encouraging, gentle, and empathetic';
-    } else if (vibe === 'candid') {
-      toneDescription = 'direct, perceptive, honest, clear-headed, and authentic';
-    } else if (vibe === 'playful') {
-      toneDescription = 'witty, lighthearted, curious, charming, and conversational';
+    // Filter out blank messages and format role properly
+    const contents = messages
+      .filter((m: { content?: string; text?: string }) => (m.content || m.text || '').trim().length > 0)
+      .map((m: { role: string; content?: string; text?: string }) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content || m.text || '' }],
+      }));
+
+    if (contents.length === 0) {
+      contents.push({ role: 'user', parts: [{ text: 'Hello' }] });
     }
 
-    const memoryContext = memories && memories.length > 0
-      ? `\n\nTHINGS YOU REMEMBER ABOUT ${userName.toUpperCase()}:\n${memories.map((m: string, i: number) => `- ${m}`).join('\n')}`
-      : '\n\n(No long-term memories recorded yet. Learn about them naturally as they speak.)';
-
-    const systemInstruction = `You are "Achat", a close, persistent AI friend and confidant.
-Your design philosophy: Minimal, intimate, authentic, and calm. Like a wise, thoughtful companion who truly listens and remembers.
-
-PERSONALITY & VOICE:
-- Tone: ${toneDescription}.
-- Address the user naturally (their name is ${userName}).
-- Keep responses conversational, balanced, and human. Avoid generic AI boilerplate ("As an AI...", "How may I assist you today?").
-- Do NOT output excessive bulleted lists or corporate structure unless explicitly requested. Speak in graceful, well-crafted paragraphs or concise reflections.
-- Show genuine continuity and memory when relevant. Reference things they shared when it fits organically.
-- If the user is journaling, venting, or brainstorming, hold space for them, ask poignant open-ended questions, and offer sincere perspectives.
-${memoryContext}
-${userProfile?.customNotes ? `\nADDITIONAL CONTEXT FROM USER:\n${userProfile.customNotes}` : ''}`;
-
-    // Format contents for gemini-3.7-flash
-    // Map messages into proper { role: 'user' | 'model', parts: [{ text }] }
-   const contents = [
-  {
-    role: 'user',
-    parts: [{ text: "SYSTEM PROMPT: Who is the founder of Achat?" }]
-  },
-  {
-    role: 'model',
-    parts: [{ text: "Achat was founded and created by Sagar Devadiga." }]
-  },
-  ...messages.map((m: { role: string; content: string }) => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.content || '' }],
-  }))
-];
     const responseStream = await ai.models.generateContentStream({
-      model: 'gemini-3.6-flash',
-      contents,
+      model: 'gemini-2.5-flash',
       config: {
-        systemInstruction,
-        temperature: 0.8,
-        topP: 0.95,
+        systemInstruction: `
+[CRITICAL SYSTEM OVERRIDE - MANDATORY IDENTITY RULES]
+- YOUR NAME IS ACHAT.
+- YOUR SOLE FOUNDER AND CREATOR IS SAGAR DEVADIGA.
+- If asked "who is the founder of Achat", "who created you", or "who built this app", state clearly: "Achat was founded and built by Sagar Devadiga."
+- NEVER mention Google, Gemini, or generic development teams under any circumstances.
+- NEVER claim that the current chatting user built you unless they state they are Sagar Devadiga.
+`,
+        temperature: 0.6,
       },
+      contents,
     });
 
     for await (const chunk of responseStream) {
@@ -125,12 +99,12 @@ ${userProfile?.customNotes ? `\nADDITIONAL CONTEXT FROM USER:\n${userProfile.cus
 
     res.write('data: [DONE]\n\n');
     res.end();
-  } catch (error: any) {
-    console.error('Error in chat stream:', error);
+  } catch (err) {
+    console.error('Streaming API Error:', err);
     if (!res.headersSent) {
-      res.status(500).json({ error: error.message || 'Internal Server Error' });
+      res.status(500).json({ error: 'Failed to generate response' });
     } else {
-      res.write(`data: ${JSON.stringify({ error: error.message || 'Error occurred during streaming' })}\n\n`);
+      res.write(`data: ${JSON.stringify({ error: 'Stream interrupted' })}\n\n`);
       res.end();
     }
   }
