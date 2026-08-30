@@ -100,7 +100,7 @@ ${userProfile?.customNotes ? `\nADDITIONAL CONTEXT FROM USER:\n${userProfile.cus
     }));
 
     const responseStream = await ai.models.generateContentStream({
-      model: 'gemini-3.7-flash',
+      model: 'gemini-1.5-flash',
       contents,
       config: {
         systemInstruction,
