@@ -75,8 +75,8 @@ app.post('/api/chat/stream', async (req, res) => {
     }
 
     const responseStream = await ai.models.generateContentStream({
-      model: 'gemini-2.5-flash',
-      config: {
+      model: 'models/gemini-2.5-flash',
+      config: {model: 'models/gemini-2.5-flash',
         systemInstruction: `
 [CRITICAL SYSTEM OVERRIDE - MANDATORY IDENTITY RULES]
 - YOUR NAME IS ACHAT.
